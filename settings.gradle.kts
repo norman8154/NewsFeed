@@ -24,4 +24,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "NewsFeed"
 include(":app")
- 
+include(":core:retrofit")
+include(":core:model")
+include(":base:repository")
+include(":core:room")
+include(":core:resource")
