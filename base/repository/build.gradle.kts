@@ -20,17 +20,22 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // minSdk 24 需要 desugaring 才能使用 java.time（解析 ISO-8601 時間戳）
+        isCoreLibraryDesugaringEnabled = true
     }
 
 }
 
 dependencies {
 
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
     implementation(project(path = ":core:model"))
     implementation(project(path = ":core:retrofit"))
+    implementation(project(path = ":core:room"))
 
     testImplementation(libs.junit)
 }
