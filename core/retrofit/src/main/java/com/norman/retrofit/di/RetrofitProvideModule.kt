@@ -1,7 +1,7 @@
 package com.norman.retrofit.di
 
 import com.norman.retrofit.BuildConfig
-import com.norman.retrofit.api.NewsApi
+import com.norman.retrofit.api.ArticleApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,8 +22,8 @@ object RetrofitProvideModule {
 
     @Provides
     @Singleton
-    @Named("news")
-    fun provideNewsRetrofit(): Retrofit {
+    @Named("article")
+    fun provideArticleRetrofit(): Retrofit {
         val json = Json {
             ignoreUnknownKeys = true
             coerceInputValues = true
@@ -52,5 +52,5 @@ object RetrofitProvideModule {
 
     @Provides
     @Singleton
-    fun provideNewsApi(@Named("news") retrofit: Retrofit): NewsApi = retrofit.create(NewsApi::class.java)
+    fun provideArticleApi(@Named("article") retrofit: Retrofit): ArticleApi = retrofit.create(ArticleApi::class.java)
 }

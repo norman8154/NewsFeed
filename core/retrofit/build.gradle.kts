@@ -43,5 +43,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    implementation(project(path = ":core:model"))
+
     testImplementation(libs.junit)
 }
