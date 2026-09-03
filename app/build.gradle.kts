@@ -61,10 +61,16 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.collections.immutable)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     ksp(libs.hilt.compiler)
 
     implementation(project(path = ":base:repository"))
     implementation(project(path = ":core:model"))
+    implementation(project(path = ":core:resource"))
+    implementation(project(path = ":core:room"))
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

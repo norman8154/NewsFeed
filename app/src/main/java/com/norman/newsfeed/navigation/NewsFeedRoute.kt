@@ -2,14 +2,16 @@ package com.norman.newsfeed.navigation
 
 import kotlinx.serialization.Serializable
 
-@Serializable
-data object MainRoute
+sealed class Route
 
 @Serializable
-data object FeedRoute
+data object MainRoute: Route()
 
 @Serializable
-data object SavedRoute
+data object FeedRoute: Route()
 
 @Serializable
-data class ArticleDetailRoute(val articleId: Long)
+data object SavedRoute: Route()
+
+@Serializable
+data class ArticleDetailRoute(val articleId: Long): Route()

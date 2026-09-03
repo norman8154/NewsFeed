@@ -6,6 +6,9 @@ import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -25,6 +28,22 @@ fun Long.isToday(): Boolean {
     return cal1.get(Calendar.ERA) == cal2.get(Calendar.ERA) &&
             cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
             cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
+private val articleDateFormatter = DateTimeFormatter.ofPattern("yyyy-M-d", Locale.US)
+
+fun Long.toArticleTime(): String {
+    val elapsedMinutes = ((System.currentTimeMillis() - this) / 60_000L).coerceAtLeast(0L)
+
+    return when {
+        elapsedMinutes < 60L -> "$elapsedMinutes min"
+
+        elapsedMinutes < 24L * 60L -> "${elapsedMinutes / 60L} hr"
+
+        else -> Instant.ofEpochMilli(this)
+            .atZone(ZoneId.systemDefault())
+            .format(articleDateFormatter)
+    }
 }
 
 inline fun <T> T?.ifNull(block: () -> Unit): T? {
@@ -121,3 +140,6 @@ public inline fun <T, R> Iterable<T>?.mapOrDefault(
 ): List<R> {
     return this?.map(transform) ?: defaultList
 }
+
+fun String.toEpochMilli(): Long =
+    runCatching { Instant.parse(this).toEpochMilli() }.getOrNull().or(0L)

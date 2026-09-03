@@ -17,7 +17,11 @@ fun NewsFeedNavHost(
         startDestination = MainRoute,
     ) {
         composable<MainRoute> {
-            MainScreen()
+            MainScreen(
+                onArticleClicked = {
+                    navController.navigate(ArticleDetailRoute(it))
+                }
+            )
         }
 
         composable<ArticleDetailRoute> { backStackEntry ->
