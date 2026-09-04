@@ -15,25 +15,29 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
-import com.norman.newsfeed.composable.LocalSnackbarHostState
-import com.norman.newsfeed.pojo.messageResId
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.norman.newsfeed.base.topSystemInsetsPadding
 import com.norman.newsfeed.composable.EmptyView
+import com.norman.newsfeed.composable.LocalSnackbarHostState
 import com.norman.newsfeed.composable.LowInternetIndicator
 import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.newsfeed.pojo.FeedListItem
+import com.norman.newsfeed.pojo.messageResId
 import com.norman.resource.R
 import com.norman.resource.theme.Headline
 import com.norman.resource.theme.PrimaryGreen
@@ -46,9 +50,20 @@ fun FeedView(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(Unit) {
-        viewModel.sendIntent(FeedIntent.Init)
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                viewModel.sendIntent(FeedIntent.OnEnterPage)
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     LaunchedEffect(Unit) {

@@ -5,7 +5,7 @@ import com.norman.newsfeed.pojo.ArticleBO
 
 sealed class FeedIntent : UiIntent {
 
-    data object Init : FeedIntent()
+    data object OnEnterPage : FeedIntent()
 
     data object OnArticleLoadMore : FeedIntent()
 

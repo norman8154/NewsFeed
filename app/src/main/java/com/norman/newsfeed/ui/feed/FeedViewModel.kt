@@ -5,8 +5,8 @@ import com.norman.newsfeed.base.BaseViewModel
 import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.newsfeed.pojo.FeedListItem
 import com.norman.newsfeed.pojo.ServiceCardBO
-import com.norman.newsfeed.pojo.WeatherBO
 import com.norman.newsfeed.pojo.ToastType
+import com.norman.newsfeed.pojo.WeatherBO
 import com.norman.newsfeed.useCase.ArticleUseCase
 import com.norman.newsfeed.useCase.ServiceCardUseCase
 import com.norman.newsfeed.useCase.WeatherUseCase
@@ -63,16 +63,18 @@ class FeedViewModel @Inject constructor(
     override suspend fun handleIntent(intent: FeedIntent) {
         when (intent) {
 
-            is FeedIntent.Init -> {
-                if (!isDataLoaded) {
+            is FeedIntent.OnEnterPage -> {
+                val isInitialLoad = !isDataLoaded
+
+                if (isInitialLoad) {
                     isDataLoaded = true
 
                     _uiState.update {
                         it.copy(isArticleFetching = true)
                     }
-
-                    loadAllSources(isRefreshing = false)
                 }
+
+                reloadStaleSources(isInitialLoad = isInitialLoad)
             }
 
             is FeedIntent.OnArticleLoadMore -> {
@@ -98,7 +100,7 @@ class FeedViewModel @Inject constructor(
                     )
                 }
 
-                loadAllSources(isRefreshing = true)
+                loadAllSources()
             }
 
             is FeedIntent.OnUserClickSaveArticle -> {
@@ -121,11 +123,11 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    private fun loadAllSources(isRefreshing: Boolean) {
+    private fun loadAllSources() {
         viewModelScope.launch {
             coroutineScope {
                 val articleDeferred = async {
-                    loadFirstPageArticleList(isRefreshing = isRefreshing)
+                    loadFirstPageArticleList()
                 }
                 val weatherDeferred = async { loadWeather() }
                 val serviceCardDeferred = async { loadServiceCardList() }
@@ -137,29 +139,14 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadFirstPageArticleList(isRefreshing: Boolean) {
-        if (!isRefreshing) {
-            val lastFetchedAt = freshnessRepository.getLastFetchedAt(FeedSource.ARTICLE)
-
-            if (!freshnessRepository.isStale(FeedSource.ARTICLE, lastFetchedAt)) {
-                val cachedArticleList = articleUseCase.getCachedArticleBOList()
-
-                if (cachedArticleList.isNotEmpty()) {
-                    articleList = cachedArticleList.toPersistentList()
-                    articleHasMore = true
-
-                    return
-                }
-            }
-        }
-
-        loadArticleList(offset = 0, isRefreshing = isRefreshing)
+    private suspend fun loadFirstPageArticleList() {
+        loadArticleList(offset = 0, replaceExisting = true)
     }
 
     private suspend fun loadArticleList(
         limit: Int = ARTICLE_PAGE_SIZE,
         offset: Int = 0,
-        isRefreshing: Boolean = false,
+        replaceExisting: Boolean = false,
     ) {
         articleRepository.fetchArticleList(limit, offset)
             .onSuccess { response ->
@@ -169,7 +156,7 @@ class FeedViewModel @Inject constructor(
                     savedIdList = savedIdList,
                 )
 
-                articleList = if (isRefreshing) {
+                articleList = if (replaceExisting) {
                     fetchedArticleList.toPersistentList()
                 } else {
                     articleList.addingAll(fetchedArticleList)
@@ -178,7 +165,9 @@ class FeedViewModel @Inject constructor(
                 articleHasMore = response.next != null
 
                 if (offset == 0) {
-                    articleUseCase.replaceCachedArticleList(articleList)
+                    articleUseCase.replaceCachedArticleList(
+                        fetchedArticleList.take(ARTICLE_PAGE_SIZE)
+                    )
 
                     freshnessRepository.setLastFetchedAt(FeedSource.ARTICLE)
                 }
@@ -187,11 +176,62 @@ class FeedViewModel @Inject constructor(
 
                 emitUiEvent(FeedEvent.OnShowToast(ToastType.Unknown))
 
-                if (articleList.isEmpty()) {
-                    articleList = articleUseCase.getCachedArticleBOList().toPersistentList()
-                    articleHasMore = false
+                if (offset == 0 && articleList.isEmpty()) {
+                    val cachedArticleList = articleUseCase.getCachedArticleBOList()
+
+                    if (cachedArticleList.isNotEmpty()) {
+                        articleList = cachedArticleList.toPersistentList()
+                        articleHasMore = false
+                    }
                 }
             }
+    }
+
+    private fun reloadStaleSources(isInitialLoad: Boolean = false) {
+        viewModelScope.launch {
+            val isArticleStale = isSourceStale(FeedSource.ARTICLE)
+            val shouldReloadArticle = isInitialLoad || isArticleStale || articleList.isEmpty()
+            val shouldReloadWeather = isSourceStale(FeedSource.WEATHER) || weatherBO == null
+            val shouldReloadServiceCard =
+                isSourceStale(FeedSource.SERVICE_CARD) || serviceCardList.isEmpty()
+
+            if (shouldReloadArticle) {
+                _uiState.update {
+                    it.copy(
+                        isArticleFetching = true,
+                        isArticleRefreshing = true
+                    )
+                }
+            }
+
+            coroutineScope {
+                val articleDeferred = async {
+                    if (shouldReloadArticle) {
+                        loadFirstPageArticleList()
+                    }
+                }
+                val weatherDeferred = async {
+                    if (shouldReloadWeather) {
+                        loadWeather()
+                    }
+                }
+                val serviceCardDeferred = async {
+                    if (shouldReloadServiceCard) {
+                        loadServiceCardList()
+                    }
+                }
+
+                awaitAll(articleDeferred, weatherDeferred, serviceCardDeferred)
+            }
+
+            publishFeedList(isLoadFinished = isInitialLoad || shouldReloadArticle)
+        }
+    }
+
+    private suspend fun isSourceStale(source: FeedSource): Boolean {
+        val lastFetchedAt = freshnessRepository.getLastFetchedAt(source)
+
+        return freshnessRepository.isStale(source, lastFetchedAt)
     }
 
     private suspend fun loadWeather() {
