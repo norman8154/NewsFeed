@@ -29,7 +29,7 @@ class ArticleRepositoryImpl @Inject constructor(
 
     override suspend fun getCachedArticleById(id: Long): CachedArticleEntity? = cachedArticleDao.getById(id)
 
-    override fun getAllCachedArticleFlow(): Flow<List<CachedArticleEntity>> = cachedArticleDao.getAllFlow()
+    override suspend fun getAllCachedArticle(): List<CachedArticleEntity> = cachedArticleDao.getAll()
 
     override suspend fun replaceAllCachedArticle(articles: List<CachedArticleEntity>) = cachedArticleDao.replaceAll(articles)
 

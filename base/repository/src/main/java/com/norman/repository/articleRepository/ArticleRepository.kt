@@ -14,7 +14,7 @@ interface ArticleRepository {
 
     suspend fun getCachedArticleById(id: Long): CachedArticleEntity?
 
-    fun getAllCachedArticleFlow(): Flow<List<CachedArticleEntity>>
+    suspend fun getAllCachedArticle(): List<CachedArticleEntity>
 
     suspend fun replaceAllCachedArticle(articles: List<CachedArticleEntity>)
 

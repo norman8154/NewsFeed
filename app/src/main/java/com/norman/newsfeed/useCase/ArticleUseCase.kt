@@ -111,4 +111,36 @@ class ArticleUseCase @Inject constructor(
 
         return articleRepository.insertSavedArticle(entity)
     }
+
+    suspend fun replaceCachedArticleList(articleList: List<ArticleBO>) {
+        articleRepository.replaceAllCachedArticle(
+            articles = articleList.map { convertArticleBOToCachedArticleEntity(it) }
+        )
+    }
+
+    suspend fun getCachedArticleBOList(): List<ArticleBO> {
+        val savedIdSet = articleRepository.getSavedArticleIdList().toSet()
+
+        return articleRepository.getAllCachedArticle().map { cachedArticle ->
+            convertCachedArticleEntityToArticleBO(
+                cachedArticle = cachedArticle,
+                isSaved = cachedArticle.id in savedIdSet,
+            )
+        }
+    }
+
+    private fun convertArticleBOToCachedArticleEntity(articleBO: ArticleBO): CachedArticleEntity {
+        return CachedArticleEntity(
+            id = articleBO.id,
+            title = articleBO.title,
+            authorName = articleBO.authorName,
+            newsSite = articleBO.newsSite,
+            url = articleBO.url,
+            imageUrl = articleBO.imageUrl,
+            publishTime = articleBO.publishTime,
+            updateTime = articleBO.updateTime,
+            summary = articleBO.summary,
+            isFeatured = articleBO.isFeatured,
+        )
+    }
 }
