@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="article">文章</string>
-    <string name="saved">收藏</string>
+    <string name="article"><![CDATA[文章]]></string>
+    <string name="saved"><![CDATA[收藏]]></string>
+    <string name="apparent_temperate"><![CDATA[體感溫度]]></string>
+    <string name="last_update_time"><![CDATA[更新時間 {update_time}]]></string>
 </resources>

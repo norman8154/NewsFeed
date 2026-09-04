@@ -2,11 +2,24 @@ package com.norman.newsfeed.ui.feed
 
 import androidx.lifecycle.viewModelScope
 import com.norman.newsfeed.base.BaseViewModel
+import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.newsfeed.pojo.FeedListItem
+import com.norman.newsfeed.pojo.ServiceCardBO
+import com.norman.newsfeed.pojo.WeatherBO
 import com.norman.newsfeed.useCase.ArticleUseCase
+import com.norman.newsfeed.useCase.ServiceCardUseCase
+import com.norman.newsfeed.useCase.WeatherUseCase
 import com.norman.repository.articleRepository.ArticleRepository
+import com.norman.repository.serviceCardRepository.ServiceCardRepository
+import com.norman.repository.weatherRepository.WeatherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.mutate
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -14,14 +27,27 @@ import javax.inject.Inject
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
-    private val articleUseCase: ArticleUseCase
+    private val weatherRepository: WeatherRepository,
+    private val serviceCardRepository: ServiceCardRepository,
+    private val articleUseCase: ArticleUseCase,
+    private val weatherUseCase: WeatherUseCase,
+    private val serviceCardUseCase: ServiceCardUseCase,
 ) : BaseViewModel<FeedState, FeedIntent, FeedEvent>(FeedState.initial) {
 
     companion object {
         private const val ARTICLE_PAGE_SIZE = 20
+        private const val SERVICE_CARD_PAGE_SIZE = 5
+        private const val SERVICE_CARD_INDEX = 6
+
+        private const val WEATHER_LATITUDE = 25.03f
+        private const val WEATHER_LONGITUDE = 121.56f
     }
 
     private var isDataLoaded = false
+    private var articleList = persistentListOf<ArticleBO>()
+    private var articleHasMore = true
+    private var weatherBO: WeatherBO? = null
+    private var serviceCardList = persistentListOf<ServiceCardBO>()
 
     init {
         observeSavedArticleList()
@@ -38,7 +64,7 @@ class FeedViewModel @Inject constructor(
                         it.copy(isArticleFetching = true)
                     }
 
-                    fetchArticleList()
+                    loadAllSources(isRefreshing = false)
                 }
             }
 
@@ -48,7 +74,11 @@ class FeedViewModel @Inject constructor(
                         it.copy(isArticleFetching = true)
                     }
 
-                    fetchArticleList(offset = uiState.value.feedList.count { it is FeedListItem.Article })
+                    viewModelScope.launch {
+                        loadArticleList(offset = articleList.size)
+
+                        publishFeedList(isLoadFinished = true)
+                    }
                 }
             }
 
@@ -61,7 +91,7 @@ class FeedViewModel @Inject constructor(
                     )
                 }
 
-                fetchArticleList(offset = 0, isRefreshing = true)
+                loadAllSources(isRefreshing = true)
             }
 
             is FeedIntent.OnUserClickSaveArticle -> {
@@ -80,42 +110,68 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    private fun fetchArticleList(
+    private fun loadAllSources(isRefreshing: Boolean) {
+        viewModelScope.launch {
+            coroutineScope {
+                val articleDeferred = async {
+                    loadArticleList(offset = 0, isRefreshing = isRefreshing)
+                }
+                val weatherDeferred = async { loadWeather() }
+                val serviceCardDeferred = async { loadServiceCardList() }
+
+                awaitAll(articleDeferred, weatherDeferred, serviceCardDeferred)
+            }
+
+            publishFeedList(isLoadFinished = true)
+        }
+    }
+
+    private suspend fun loadArticleList(
         limit: Int = ARTICLE_PAGE_SIZE,
         offset: Int = 0,
         isRefreshing: Boolean = false,
     ) {
-        viewModelScope.launch {
-            articleRepository.fetchArticleList(limit, offset)
-                .onSuccess { response ->
-                    val savedIdList = articleRepository.getSavedArticleIdList()
-                    val articleList = articleUseCase.convertArticleListResponseToArticleBO(
-                        response = response,
-                        savedIdList = savedIdList,
-                    ).map { FeedListItem.Article(it) }
+        articleRepository.fetchArticleList(limit, offset)
+            .onSuccess { response ->
+                val savedIdList = articleRepository.getSavedArticleIdList()
+                val fetchedArticleList = articleUseCase.convertArticleListResponseToArticleBO(
+                    response = response,
+                    savedIdList = savedIdList,
+                )
 
-                    _uiState.update {
-                        it.copy(
-                            feedList = if (isRefreshing) {
-                                articleList.toPersistentList()
-                            } else {
-                                it.feedList.addingAll(articleList)
-                            },
-                            isArticleHasMore = response.next != null,
-                            isArticleFetching = false,
-                            isArticleRefreshing = false,
-                        )
-                    }
-                }.onFailure {
-                    it.printStackTrace()
-
-                    _uiState.update {
-                        it.copy(
-                            isArticleFetching = false,
-                            isArticleRefreshing = false,
-                        )
-                    }
+                articleList = if (isRefreshing) {
+                    fetchedArticleList.toPersistentList()
+                } else {
+                    articleList.addingAll(fetchedArticleList)
                 }
+
+                articleHasMore = response.next != null
+            }.onFailure {
+                it.printStackTrace()
+            }
+    }
+
+    private suspend fun loadWeather() {
+        weatherRepository.fetchWeather(
+            latitude = WEATHER_LATITUDE,
+            longitude = WEATHER_LONGITUDE,
+        ).onSuccess { response ->
+            weatherBO = weatherUseCase.convertWeatherResponseToWeatherBO(response)
+        }.onFailure {
+            it.printStackTrace()
+        }
+    }
+
+    private suspend fun loadServiceCardList() {
+        serviceCardRepository.fetchServiceCardList(
+            limit = SERVICE_CARD_PAGE_SIZE,
+            skip = 0,
+        ).onSuccess { response ->
+            serviceCardList = serviceCardUseCase
+                .convertServiceCardListResponseToServiceCardBO(response)
+                .toPersistentList()
+        }.onFailure {
+            it.printStackTrace()
         }
     }
 
@@ -125,24 +181,38 @@ class FeedViewModel @Inject constructor(
                 .collect { savedArticleList ->
                     val savedIdSet = savedArticleList.map { it.id }.toSet()
 
-                    _uiState.update {
-                        it.copy(
-                            feedList = it.feedList.map { item ->
-                                if (item is FeedListItem.Article) {
-                                    item.copy(
-                                        articleBO = item.articleBO.copy(
-                                            isSaved = savedIdSet.contains(
-                                                item.articleBO.id
-                                            )
-                                        )
-                                    )
-                                } else {
-                                    item
-                                }
-                            }.toPersistentList()
-                        )
-                    }
+                    articleList = articleList.map { articleBO ->
+                        articleBO.copy(isSaved = savedIdSet.contains(articleBO.id))
+                    }.toPersistentList()
+
+                    publishFeedList()
                 }
+        }
+    }
+
+    private fun publishFeedList(isLoadFinished: Boolean = false) {
+        _uiState.update {
+            it.copy(
+                feedList = createFeedList(),
+                isArticleHasMore = articleHasMore,
+                isArticleFetching = if (isLoadFinished) false else it.isArticleFetching,
+                isArticleRefreshing = if (isLoadFinished) false else it.isArticleRefreshing,
+            )
+        }
+    }
+
+    private fun createFeedList(): PersistentList<FeedListItem> {
+        return persistentListOf<FeedListItem>().mutate { feedList ->
+            weatherBO?.let { feedList.add(FeedListItem.Weather(it)) }
+
+            articleList.forEach { feedList.add(FeedListItem.Article(it)) }
+
+            if (serviceCardList.isNotEmpty()) {
+                feedList.add(
+                    SERVICE_CARD_INDEX.coerceAtMost(feedList.size),
+                    FeedListItem.ServiceCard(serviceCardList),
+                )
+            }
         }
     }
 }

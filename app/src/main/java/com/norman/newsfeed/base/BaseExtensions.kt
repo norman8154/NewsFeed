@@ -32,6 +32,8 @@ fun Long.isToday(): Boolean {
 
 private val articleDateFormatter = DateTimeFormatter.ofPattern("yyyy-M-d", Locale.US)
 
+private const val DEFAULT_DATE_TIME_PATTERN = "yyyy/MM/dd HH:mm"
+
 fun Long.toArticleTime(): String {
     val elapsedMinutes = ((System.currentTimeMillis() - this) / 60_000L).coerceAtLeast(0L)
 
@@ -44,6 +46,14 @@ fun Long.toArticleTime(): String {
             .atZone(ZoneId.systemDefault())
             .format(articleDateFormatter)
     }
+}
+
+fun Long.toDateTimeString(
+    pattern: String = DEFAULT_DATE_TIME_PATTERN,
+): String {
+    return Instant.ofEpochMilli(this)
+        .atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
 }
 
 inline fun <T> T?.ifNull(block: () -> Unit): T? {
@@ -143,3 +153,23 @@ public inline fun <T, R> Iterable<T>?.mapOrDefault(
 
 fun String.toEpochMilli(): Long =
     runCatching { Instant.parse(this).toEpochMilli() }.getOrNull().or(0L)
+
+fun localizeString(
+    content: String,
+    parameters: HashMap<String, String> = hashMapOf(),
+): String {
+    return localizeParser(content, parameters)
+}
+
+fun localizeParser(content: String, parameters: HashMap<String, String> = hashMapOf()): String {
+    return kotlin.runCatching {
+        var result = content
+
+        parameters.forEach { (key, value) ->
+            val placeholder = "{${key}}"
+            result = result.replace(placeholder, value, ignoreCase = true)
+        }
+
+        result
+    }.getOrDefault("")
+}

@@ -125,6 +125,10 @@ private fun FeedListView(
                 contentType = { _, item ->
                     when (item) {
                         is FeedListItem.Article -> FeedListItemType.ARTICLE
+
+                        is FeedListItem.Weather -> FeedListItemType.WEATHER
+
+                        is FeedListItem.ServiceCard -> FeedListItemType.SERVICE_CARD
                     }
                 },
             ) { index, item ->
@@ -151,6 +155,14 @@ private fun FeedListView(
                                 onSaveClicked(it)
                             }
                         )
+                    }
+
+                    is FeedListItem.Weather -> {
+                        WeatherListItemView(weatherBO = item.weatherBO)
+                    }
+
+                    is FeedListItem.ServiceCard -> {
+                        ServiceCardListItemView(serviceCardList = item.serviceCardList)
                     }
                 }
             }
