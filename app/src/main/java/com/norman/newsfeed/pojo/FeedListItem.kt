@@ -2,6 +2,6 @@ package com.norman.newsfeed.pojo
 
 sealed class FeedListItem {
 
-    class Article(val articleBO: ArticleBO): FeedListItem()
+    data class Article(val articleBO: ArticleBO): FeedListItem()
 
 }

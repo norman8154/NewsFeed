@@ -1,5 +1,6 @@
 package com.norman.newsfeed.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -56,16 +58,28 @@ fun MainScreen(
         ) {
             composable<FeedRoute> {
                 FeedView(
+                    viewModel = hiltViewModel(),
                     onArticleClicked = onArticleClicked
                 )
             }
 
             composable<SavedRoute> {
-                SavedView()
+                SavedView(
+                    viewModel = hiltViewModel(),
+                    onArticleClicked = onArticleClicked
+                )
             }
         }
 
         val backStack by navController.currentBackStackEntryAsState()
+
+        BackHandler(enabled = backStack?.destination?.hasRoute<FeedRoute>() == false) {
+            navController.navigate(FeedRoute) {
+                popUpTo<FeedRoute> { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
 
         Row(
             modifier = Modifier
@@ -80,7 +94,11 @@ fun MainScreen(
                         .fillMaxHeight()
                         .weight(1f)
                         .noIndicationClickable {
-                            navController.navigate(tab.route)
+                            navController.navigate(tab.route) {
+                                popUpTo<FeedRoute> { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                 ) {
                     HorizontalDivider()

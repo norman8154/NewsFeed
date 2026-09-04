@@ -2,6 +2,7 @@ package com.norman.newsfeed.ui.feed
 
 import androidx.lifecycle.viewModelScope
 import com.norman.newsfeed.base.BaseViewModel
+import com.norman.newsfeed.pojo.FeedListItem
 import com.norman.newsfeed.useCase.ArticleUseCase
 import com.norman.repository.articleRepository.ArticleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,19 +15,31 @@ import javax.inject.Inject
 class FeedViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
     private val articleUseCase: ArticleUseCase
-): BaseViewModel<FeedState, FeedIntent, FeedEvent>(FeedState.initial) {
+) : BaseViewModel<FeedState, FeedIntent, FeedEvent>(FeedState.initial) {
 
-    private val ARTICLE_PAGE_SIZE = 20
+    companion object {
+        private const val ARTICLE_PAGE_SIZE = 20
+    }
+
+    private var isDataLoaded = false
+
+    init {
+        observeSavedArticleList()
+    }
 
     override suspend fun handleIntent(intent: FeedIntent) {
         when (intent) {
 
             is FeedIntent.Init -> {
-                _uiState.update {
-                    it.copy(isArticleFetching = true)
-                }
+                if (!isDataLoaded) {
+                    isDataLoaded = true
 
-                fetchArticleList()
+                    _uiState.update {
+                        it.copy(isArticleFetching = true)
+                    }
+
+                    fetchArticleList()
+                }
             }
 
             is FeedIntent.OnArticleLoadMore -> {
@@ -35,7 +48,7 @@ class FeedViewModel @Inject constructor(
                         it.copy(isArticleFetching = true)
                     }
 
-                    fetchArticleList(offset = uiState.value.articleList.size)
+                    fetchArticleList(offset = uiState.value.feedList.count { it is FeedListItem.Article })
                 }
             }
 
@@ -49,6 +62,16 @@ class FeedViewModel @Inject constructor(
                 }
 
                 fetchArticleList(offset = 0, isRefreshing = true)
+            }
+
+            is FeedIntent.OnUserClickSaveArticle -> {
+                viewModelScope.launch {
+                    if (intent.articleBO.isSaved) {
+                        articleRepository.deleteSavedArticleById(intent.articleBO.id)
+                    } else {
+                        articleUseCase.saveArticleBOToDB(intent.articleBO)
+                    }
+                }
             }
         }
     }
@@ -65,14 +88,14 @@ class FeedViewModel @Inject constructor(
                     val articleList = articleUseCase.convertArticleListResponseToArticleBO(
                         response = response,
                         savedIdList = savedIdList,
-                    )
+                    ).map { FeedListItem.Article(it) }
 
                     _uiState.update {
                         it.copy(
-                            articleList = if (isRefreshing) {
+                            feedList = if (isRefreshing) {
                                 articleList.toPersistentList()
                             } else {
-                                it.articleList.addingAll(articleList)
+                                it.feedList.addingAll(articleList)
                             },
                             isArticleHasMore = response.next != null,
                             isArticleFetching = false,
@@ -86,6 +109,33 @@ class FeedViewModel @Inject constructor(
                         it.copy(
                             isArticleFetching = false,
                             isArticleRefreshing = false,
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun observeSavedArticleList() {
+        viewModelScope.launch {
+            articleRepository.getAllSavedArticleFlow()
+                .collect { savedArticleList ->
+                    val savedIdSet = savedArticleList.map { it.id }.toSet()
+
+                    _uiState.update {
+                        it.copy(
+                            feedList = it.feedList.map { item ->
+                                if (item is FeedListItem.Article) {
+                                    item.copy(
+                                        articleBO = item.articleBO.copy(
+                                            isSaved = savedIdSet.contains(
+                                                item.articleBO.id
+                                            )
+                                        )
+                                    )
+                                } else {
+                                    item
+                                }
+                            }.toPersistentList()
                         )
                     }
                 }

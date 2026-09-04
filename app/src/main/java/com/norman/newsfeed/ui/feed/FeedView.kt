@@ -25,19 +25,19 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.norman.newsfeed.base.topSystemInsetsPadding
+import com.norman.newsfeed.pojo.ArticleBO
+import com.norman.newsfeed.pojo.FeedListItem
 import com.norman.resource.R
 import com.norman.resource.theme.Headline
 import com.norman.resource.theme.PrimaryGreen
 
 @Composable
 fun FeedView(
+    viewModel: FeedViewModel,
     onArticleClicked: (id: Long) -> Unit
 ) {
-    val viewModel = hiltViewModel<FeedViewModel>()
     val state by viewModel.uiState.collectAsState()
-    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) {
         viewModel.sendIntent(FeedIntent.Init)
@@ -58,66 +58,105 @@ fun FeedView(
                 .fillMaxWidth()
                 .padding(vertical = 12.dp)
         )
-        Box(
+
+        FeedListView(
+            feedList = state.feedList,
+            isArticleHasMore = state.isArticleHasMore,
+            isArticleFetching = state.isArticleFetching,
+            onArticleClicked = onArticleClicked,
+            onSaveClicked = {
+                viewModel.sendIntent(FeedIntent.OnUserClickSaveArticle(it))
+            },
+            onRefreshing = {
+                viewModel.sendIntent(FeedIntent.OnRefreshing)
+            },
+            onLoadMore = {
+                viewModel.sendIntent(FeedIntent.OnArticleLoadMore)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .pullToRefresh(
-                    isRefreshing = false,
-                    state = pullToRefreshState
-                ) {
-                    viewModel.sendIntent(FeedIntent.OnRefreshing)
-                }
-        ) {
-            LazyColumn(
-                contentPadding = PaddingValues(vertical = 12.dp),
-                modifier = Modifier
-                    .matchParentSize()
+
+        )
+    }
+}
+
+@Composable
+private fun FeedListView(
+    feedList: List<FeedListItem>,
+    isArticleHasMore: Boolean,
+    isArticleFetching: Boolean,
+    onArticleClicked: (id: Long) -> Unit,
+    onSaveClicked: (ArticleBO) -> Unit,
+    onRefreshing: () -> Unit,
+    onLoadMore: () -> Unit,
+    modifier: Modifier
+) {
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    Box(
+        modifier = modifier
+            .pullToRefresh(
+                isRefreshing = false,
+                state = pullToRefreshState
             ) {
-                itemsIndexed(
-                    state.articleList,
-                    contentType = { _, _ -> FeedListItemType.ARTICLE },
-                ) { index, articleBO ->
-
-                    LaunchedEffect(
-                        index,
-                        state.articleList,
-                        state.isArticleHasMore,
-                        state.isArticleFetching
-                    ) {
-                        if (state.isArticleHasMore && !state.isArticleFetching && state.articleList.size - index < 3) {
-                            viewModel.sendIntent(FeedIntent.OnArticleLoadMore)
-                        }
+                onRefreshing()
+            }
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(vertical = 12.dp),
+            modifier = Modifier
+                .matchParentSize()
+        ) {
+            itemsIndexed(
+                feedList,
+                contentType = { _, item ->
+                    when (item) {
+                        is FeedListItem.Article -> FeedListItemType.ARTICLE
                     }
+                },
+            ) { index, item ->
 
-                    ArticleListItemView(
-                        articleBO = articleBO,
-                        onArticleClicked = {
-                            onArticleClicked(it.id)
-                        },
-                        onSaveClicked = {
+                LaunchedEffect(
+                    index,
+                    feedList,
+                    isArticleHasMore,
+                    isArticleFetching
+                ) {
+                    if (isArticleHasMore && !isArticleFetching && feedList.size - index < 3) {
+                        onLoadMore()
+                    }
+                }
 
-                        }
-                    )
+                when (item) {
+                    is FeedListItem.Article -> {
+                        ArticleListItemView(
+                            articleBO = item.articleBO,
+                            onArticleClicked = {
+                                onArticleClicked(it.id)
+                            },
+                            onSaveClicked = {
+                                onSaveClicked(it)
+                            }
+                        )
+                    }
                 }
             }
-
-            Indicator(
-                state = pullToRefreshState,
-                isRefreshing = false,
-                containerColor = Color.LightGray,
-                color = Color.PrimaryGreen,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-            )
         }
+
+        Indicator(
+            state = pullToRefreshState,
+            isRefreshing = false,
+            containerColor = Color.LightGray,
+            color = Color.PrimaryGreen,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+        )
     }
 }
 
 @Preview
 @Composable
 private fun PreviewFeedView() {
-    FeedView {
-        
-    }
+
 }
