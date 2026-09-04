@@ -20,6 +20,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import com.norman.newsfeed.composable.LocalSnackbarHostState
+import com.norman.newsfeed.pojo.messageResId
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -47,9 +50,21 @@ fun ArticleDetailView(
     onBackClicked: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = LocalSnackbarHostState.current
+    val context = LocalContext.current
 
     LaunchedEffect(articleId) {
         viewModel.sendIntent(ArticleDetailIntent.Init(articleId))
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is ArticleDetailEvent.OnShowToast -> {
+                    snackbarHostState.showSnackbar(context.getString(event.toastType.messageResId))
+                }
+            }
+        }
     }
 
     Box(

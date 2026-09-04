@@ -10,13 +10,15 @@ data class FeedState(
     val isArticleHasMore: Boolean,
     val isArticleFetching: Boolean,
     val isArticleRefreshing: Boolean,
+    val isLowInternet: Boolean,
 ): UiState {
     companion object {
         val initial = FeedState(
             feedList = persistentListOf(),
             isArticleHasMore = true,
             isArticleFetching = false,
-            isArticleRefreshing = true
+            isArticleRefreshing = true,
+            isLowInternet = false
         )
     }
 }

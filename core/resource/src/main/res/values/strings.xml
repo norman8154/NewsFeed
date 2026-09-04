@@ -3,5 +3,15 @@
     <string name="article"><![CDATA[文章]]></string>
     <string name="saved"><![CDATA[收藏]]></string>
     <string name="apparent_temperate"><![CDATA[體感溫度]]></string>
+    <string name="retry"><![CDATA[重新載入]]></string>
     <string name="last_update_time"><![CDATA[更新時間 {update_time}]]></string>
+    <string name="feed_empty"><![CDATA[目前沒有可顯示的內容]]></string>
+    <string name="saved_empty"><![CDATA[還沒有收藏任何文章]]></string>
+    <string name="low_internet"><![CDATA[網路連線不穩定，進入離線模式]]></string>
+    <string name="saved_success"><![CDATA[收藏成功]]></string>
+    <string name="unsaved_success"><![CDATA[取消收藏]]></string>
+    <string name="unknown_error"><![CDATA[發生錯誤，請稍後再試]]></string>
+    <string name="toast_saved"><![CDATA[已加入收藏]]></string>
+    <string name="toast_un_saved"><![CDATA[已取消收藏]]></string>
+    <string name="toast_unknown"><![CDATA[操作失敗，請稍後再試]]></string>
 </resources>

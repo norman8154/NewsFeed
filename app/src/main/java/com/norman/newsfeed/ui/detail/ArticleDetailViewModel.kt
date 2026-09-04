@@ -3,6 +3,7 @@ package com.norman.newsfeed.ui.detail
 import androidx.lifecycle.viewModelScope
 import com.norman.newsfeed.base.BaseViewModel
 import com.norman.newsfeed.pojo.ArticleBO
+import com.norman.newsfeed.pojo.ToastType
 import com.norman.newsfeed.useCase.ArticleUseCase
 import com.norman.repository.articleRepository.ArticleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,8 +38,12 @@ class ArticleDetailViewModel @Inject constructor(
                 viewModelScope.launch {
                     if (intent.articleBO.isSaved) {
                         articleRepository.deleteSavedArticleById(intent.articleBO.id)
+
+                        emitUiEvent(ArticleDetailEvent.OnShowToast(ToastType.UnSaved))
                     } else {
                         articleUseCase.saveArticleBOToDB(intent.articleBO)
+
+                        emitUiEvent(ArticleDetailEvent.OnShowToast(ToastType.Saved))
                     }
                 }
             }
@@ -60,6 +65,10 @@ class ArticleDetailViewModel @Inject constructor(
                     )
                 }
                 ?: getArticleFromDB(articleId)
+
+            if (articleBO == null) {
+                emitUiEvent(ArticleDetailEvent.OnShowToast(ToastType.Unknown))
+            }
 
             _uiState.update {
                 it.copy(

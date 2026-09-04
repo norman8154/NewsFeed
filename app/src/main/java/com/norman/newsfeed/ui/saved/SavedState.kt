@@ -7,10 +7,12 @@ import kotlinx.collections.immutable.persistentListOf
 
 data class SavedState(
     val articleList: PersistentList<ArticleBO>,
+    val isLowInternet: Boolean,
 ): UiState {
     companion object {
         val initial = SavedState(
-            articleList = persistentListOf()
+            articleList = persistentListOf(),
+            isLowInternet = false
         )
     }
 }

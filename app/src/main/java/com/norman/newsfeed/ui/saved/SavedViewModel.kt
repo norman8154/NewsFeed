@@ -2,8 +2,10 @@ package com.norman.newsfeed.ui.saved
 
 import androidx.lifecycle.viewModelScope
 import com.norman.newsfeed.base.BaseViewModel
+import com.norman.newsfeed.pojo.ToastType
 import com.norman.newsfeed.useCase.ArticleUseCase
 import com.norman.repository.articleRepository.ArticleRepository
+import com.norman.repository.networkRepository.NetworkRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.update
@@ -13,11 +15,13 @@ import javax.inject.Inject
 @HiltViewModel
 class SavedViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
-    private val articleUseCase: ArticleUseCase
+    private val articleUseCase: ArticleUseCase,
+    private val networkRepository: NetworkRepository,
 ): BaseViewModel<SavedState, SavedIntent, SavedEvent>(SavedState.initial) {
 
     init {
         observeSavedArticleList()
+        observeNetworkState()
     }
 
     override suspend fun handleIntent(intent: SavedIntent) {
@@ -27,8 +31,12 @@ class SavedViewModel @Inject constructor(
                 viewModelScope.launch {
                     if (intent.articleBO.isSaved) {
                         articleRepository.deleteSavedArticleById(intent.articleBO.id)
+
+                        emitUiEvent(SavedEvent.OnShowToast(ToastType.UnSaved))
                     } else {
                         articleUseCase.saveArticleBOToDB(intent.articleBO)
+
+                        emitUiEvent(SavedEvent.OnShowToast(ToastType.Saved))
                     }
                 }
             }
@@ -64,4 +72,13 @@ class SavedViewModel @Inject constructor(
         }
     }
 
+    private fun observeNetworkState() {
+        viewModelScope.launch {
+            networkRepository.isOnline.collect { isOnline ->
+                _uiState.update {
+                    it.copy(isLowInternet = !isOnline)
+                }
+            }
+        }
+    }
 }

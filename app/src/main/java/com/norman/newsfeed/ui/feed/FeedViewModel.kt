@@ -6,10 +6,14 @@ import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.newsfeed.pojo.FeedListItem
 import com.norman.newsfeed.pojo.ServiceCardBO
 import com.norman.newsfeed.pojo.WeatherBO
+import com.norman.newsfeed.pojo.ToastType
 import com.norman.newsfeed.useCase.ArticleUseCase
 import com.norman.newsfeed.useCase.ServiceCardUseCase
 import com.norman.newsfeed.useCase.WeatherUseCase
 import com.norman.repository.articleRepository.ArticleRepository
+import com.norman.repository.freshnessRepository.FeedSource
+import com.norman.repository.freshnessRepository.FreshnessRepository
+import com.norman.repository.networkRepository.NetworkRepository
 import com.norman.repository.serviceCardRepository.ServiceCardRepository
 import com.norman.repository.weatherRepository.WeatherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +36,8 @@ class FeedViewModel @Inject constructor(
     private val articleUseCase: ArticleUseCase,
     private val weatherUseCase: WeatherUseCase,
     private val serviceCardUseCase: ServiceCardUseCase,
+    private val freshnessRepository: FreshnessRepository,
+    private val networkRepository: NetworkRepository,
 ) : BaseViewModel<FeedState, FeedIntent, FeedEvent>(FeedState.initial) {
 
     companion object {
@@ -51,6 +57,7 @@ class FeedViewModel @Inject constructor(
 
     init {
         observeSavedArticleList()
+        observeNetworkState()
     }
 
     override suspend fun handleIntent(intent: FeedIntent) {
@@ -69,7 +76,7 @@ class FeedViewModel @Inject constructor(
             }
 
             is FeedIntent.OnArticleLoadMore -> {
-                if (!uiState.value.isArticleFetching) {
+                if (!uiState.value.isArticleFetching && !uiState.value.isLowInternet) {
                     _uiState.update {
                         it.copy(isArticleFetching = true)
                     }
@@ -98,8 +105,12 @@ class FeedViewModel @Inject constructor(
                 viewModelScope.launch {
                     if (intent.articleBO.isSaved) {
                         articleRepository.deleteSavedArticleById(intent.articleBO.id)
+
+                        emitUiEvent(FeedEvent.OnShowToast(ToastType.UnSaved))
                     } else {
                         articleUseCase.saveArticleBOToDB(intent.articleBO)
+
+                        emitUiEvent(FeedEvent.OnShowToast(ToastType.Saved))
                     }
                 }
             }
@@ -114,7 +125,7 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             coroutineScope {
                 val articleDeferred = async {
-                    loadArticleList(offset = 0, isRefreshing = isRefreshing)
+                    loadFirstPageArticleList(isRefreshing = isRefreshing)
                 }
                 val weatherDeferred = async { loadWeather() }
                 val serviceCardDeferred = async { loadServiceCardList() }
@@ -124,6 +135,25 @@ class FeedViewModel @Inject constructor(
 
             publishFeedList(isLoadFinished = true)
         }
+    }
+
+    private suspend fun loadFirstPageArticleList(isRefreshing: Boolean) {
+        if (!isRefreshing) {
+            val lastFetchedAt = freshnessRepository.getLastFetchedAt(FeedSource.ARTICLE)
+
+            if (!freshnessRepository.isStale(FeedSource.ARTICLE, lastFetchedAt)) {
+                val cachedArticleList = articleUseCase.getCachedArticleBOList()
+
+                if (cachedArticleList.isNotEmpty()) {
+                    articleList = cachedArticleList.toPersistentList()
+                    articleHasMore = true
+
+                    return
+                }
+            }
+        }
+
+        loadArticleList(offset = 0, isRefreshing = isRefreshing)
     }
 
     private suspend fun loadArticleList(
@@ -146,8 +176,21 @@ class FeedViewModel @Inject constructor(
                 }
 
                 articleHasMore = response.next != null
+
+                if (offset == 0) {
+                    articleUseCase.replaceCachedArticleList(articleList)
+
+                    freshnessRepository.setLastFetchedAt(FeedSource.ARTICLE)
+                }
             }.onFailure {
                 it.printStackTrace()
+
+                emitUiEvent(FeedEvent.OnShowToast(ToastType.Unknown))
+
+                if (articleList.isEmpty()) {
+                    articleList = articleUseCase.getCachedArticleBOList().toPersistentList()
+                    articleHasMore = false
+                }
             }
     }
 
@@ -157,6 +200,8 @@ class FeedViewModel @Inject constructor(
             longitude = WEATHER_LONGITUDE,
         ).onSuccess { response ->
             weatherBO = weatherUseCase.convertWeatherResponseToWeatherBO(response)
+
+            freshnessRepository.setLastFetchedAt(FeedSource.WEATHER)
         }.onFailure {
             it.printStackTrace()
         }
@@ -170,23 +215,10 @@ class FeedViewModel @Inject constructor(
             serviceCardList = serviceCardUseCase
                 .convertServiceCardListResponseToServiceCardBO(response)
                 .toPersistentList()
+
+            freshnessRepository.setLastFetchedAt(FeedSource.SERVICE_CARD)
         }.onFailure {
             it.printStackTrace()
-        }
-    }
-
-    private fun observeSavedArticleList() {
-        viewModelScope.launch {
-            articleRepository.getAllSavedArticleFlow()
-                .collect { savedArticleList ->
-                    val savedIdSet = savedArticleList.map { it.id }.toSet()
-
-                    articleList = articleList.map { articleBO ->
-                        articleBO.copy(isSaved = savedIdSet.contains(articleBO.id))
-                    }.toPersistentList()
-
-                    publishFeedList()
-                }
         }
     }
 
@@ -212,6 +244,31 @@ class FeedViewModel @Inject constructor(
                     SERVICE_CARD_INDEX.coerceAtMost(feedList.size),
                     FeedListItem.ServiceCard(serviceCardList),
                 )
+            }
+        }
+    }
+
+    private fun observeSavedArticleList() {
+        viewModelScope.launch {
+            articleRepository.getAllSavedArticleFlow()
+                .collect { savedArticleList ->
+                    val savedIdSet = savedArticleList.map { it.id }.toSet()
+
+                    articleList = articleList.map { articleBO ->
+                        articleBO.copy(isSaved = savedIdSet.contains(articleBO.id))
+                    }.toPersistentList()
+
+                    publishFeedList()
+                }
+        }
+    }
+
+    private fun observeNetworkState() {
+        viewModelScope.launch {
+            networkRepository.isOnline.collect { isOnline ->
+                _uiState.update {
+                    it.copy(isLowInternet = !isOnline)
+                }
             }
         }
     }

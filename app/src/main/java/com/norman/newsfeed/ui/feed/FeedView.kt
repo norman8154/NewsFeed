@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,6 +19,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import com.norman.newsfeed.composable.LocalSnackbarHostState
+import com.norman.newsfeed.pojo.messageResId
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -26,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.norman.newsfeed.base.topSystemInsetsPadding
+import com.norman.newsfeed.composable.EmptyView
+import com.norman.newsfeed.composable.LowInternetIndicator
 import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.newsfeed.pojo.FeedListItem
 import com.norman.resource.R
@@ -38,6 +44,8 @@ fun FeedView(
     onArticleClicked: (id: Long) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = LocalSnackbarHostState.current
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.sendIntent(FeedIntent.Init)
@@ -48,6 +56,10 @@ fun FeedView(
             when (event) {
                 is FeedEvent.OnNavigateToArticleDetail -> {
                     onArticleClicked(event.articleId)
+                }
+
+                is FeedEvent.OnShowToast -> {
+                    snackbarHostState.showSnackbar(context.getString(event.toastType.messageResId))
                 }
             }
         }
@@ -69,10 +81,18 @@ fun FeedView(
                 .padding(vertical = 12.dp)
         )
 
+        if (state.isLowInternet) {
+            LowInternetIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+            )
+        }
+
         FeedListView(
             feedList = state.feedList,
             isArticleHasMore = state.isArticleHasMore,
             isArticleFetching = state.isArticleFetching,
+            isArticleRefreshing = state.isArticleRefreshing,
             onArticleClicked = {
                 viewModel.sendIntent(FeedIntent.OnUserClickArticle(it))
             },
@@ -98,6 +118,7 @@ private fun FeedListView(
     feedList: List<FeedListItem>,
     isArticleHasMore: Boolean,
     isArticleFetching: Boolean,
+    isArticleRefreshing: Boolean,
     onArticleClicked: (ArticleBO) -> Unit,
     onSaveClicked: (ArticleBO) -> Unit,
     onRefreshing: () -> Unit,
@@ -120,49 +141,76 @@ private fun FeedListView(
             modifier = Modifier
                 .matchParentSize()
         ) {
-            itemsIndexed(
-                feedList,
-                contentType = { _, item ->
-                    when (item) {
-                        is FeedListItem.Article -> FeedListItemType.ARTICLE
-
-                        is FeedListItem.Weather -> FeedListItemType.WEATHER
-
-                        is FeedListItem.ServiceCard -> FeedListItemType.SERVICE_CARD
-                    }
-                },
-            ) { index, item ->
-
-                LaunchedEffect(
-                    index,
-                    feedList,
-                    isArticleHasMore,
-                    isArticleFetching
-                ) {
-                    if (isArticleHasMore && !isArticleFetching && feedList.size - index < 3) {
-                        onLoadMore()
-                    }
+            if (isArticleRefreshing) {
+                item {
+                    WeatherListItemShimmerView()
                 }
 
-                when (item) {
-                    is FeedListItem.Article -> {
-                        ArticleListItemView(
-                            articleBO = item.articleBO,
-                            onArticleClicked = {
-                                onArticleClicked(it)
-                            },
-                            onSaveClicked = {
-                                onSaveClicked(it)
-                            }
-                        )
+                items(5) {
+                    ArticleListItemShimmerView()
+                }
+
+                item {
+                    ServiceCardListItemShimmerView()
+                }
+
+                items(3) {
+                    ArticleListItemShimmerView()
+                }
+            } else if (feedList.isEmpty()) {
+                item {
+                    EmptyView(
+                        text = stringResource(R.string.feed_empty),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    )
+                }
+            } else {
+                itemsIndexed(
+                    feedList,
+                    contentType = { _, item ->
+                        when (item) {
+                            is FeedListItem.Article -> FeedListItemType.ARTICLE
+
+                            is FeedListItem.Weather -> FeedListItemType.WEATHER
+
+                            is FeedListItem.ServiceCard -> FeedListItemType.SERVICE_CARD
+                        }
+                    },
+                ) { index, item ->
+
+                    LaunchedEffect(
+                        index,
+                        feedList,
+                        isArticleHasMore,
+                        isArticleFetching
+                    ) {
+                        if (isArticleHasMore && !isArticleFetching && feedList.size - index < 3) {
+                            onLoadMore()
+                        }
                     }
 
-                    is FeedListItem.Weather -> {
-                        WeatherListItemView(weatherBO = item.weatherBO)
-                    }
+                    when (item) {
+                        is FeedListItem.Article -> {
+                            ArticleListItemView(
+                                articleBO = item.articleBO,
+                                onArticleClicked = {
+                                    onArticleClicked(it)
+                                },
+                                onSaveClicked = {
+                                    onSaveClicked(it)
+                                }
+                            )
+                        }
 
-                    is FeedListItem.ServiceCard -> {
-                        ServiceCardListItemView(serviceCardList = item.serviceCardList)
+                        is FeedListItem.Weather -> {
+                            WeatherListItemView(weatherBO = item.weatherBO)
+                        }
+
+                        is FeedListItem.ServiceCard -> {
+                            ServiceCardListItemView(serviceCardList = item.serviceCardList)
+                        }
                     }
                 }
             }
