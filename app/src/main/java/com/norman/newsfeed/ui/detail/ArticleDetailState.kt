@@ -1,13 +1,16 @@
 package com.norman.newsfeed.ui.detail
 
 import com.norman.newsfeed.base.UiState
+import com.norman.newsfeed.pojo.ArticleBO
 
 data class ArticleDetailState(
-    val temp: String
+    val articleBO: ArticleBO?,
+    val isArticleFetching: Boolean,
 ): UiState {
     companion object {
         val initial = ArticleDetailState(
-            temp = ""
+            articleBO = null,
+            isArticleFetching = false
         )
     }
 }

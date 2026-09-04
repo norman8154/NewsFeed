@@ -43,6 +43,16 @@ fun FeedView(
         viewModel.sendIntent(FeedIntent.Init)
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is FeedEvent.OnNavigateToArticleDetail -> {
+                    onArticleClicked(event.articleId)
+                }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .topSystemInsetsPadding()
@@ -63,7 +73,9 @@ fun FeedView(
             feedList = state.feedList,
             isArticleHasMore = state.isArticleHasMore,
             isArticleFetching = state.isArticleFetching,
-            onArticleClicked = onArticleClicked,
+            onArticleClicked = {
+                viewModel.sendIntent(FeedIntent.OnUserClickArticle(it))
+            },
             onSaveClicked = {
                 viewModel.sendIntent(FeedIntent.OnUserClickSaveArticle(it))
             },
@@ -86,7 +98,7 @@ private fun FeedListView(
     feedList: List<FeedListItem>,
     isArticleHasMore: Boolean,
     isArticleFetching: Boolean,
-    onArticleClicked: (id: Long) -> Unit,
+    onArticleClicked: (ArticleBO) -> Unit,
     onSaveClicked: (ArticleBO) -> Unit,
     onRefreshing: () -> Unit,
     onLoadMore: () -> Unit,
@@ -133,7 +145,7 @@ private fun FeedListView(
                         ArticleListItemView(
                             articleBO = item.articleBO,
                             onArticleClicked = {
-                                onArticleClicked(it.id)
+                                onArticleClicked(it)
                             },
                             onSaveClicked = {
                                 onSaveClicked(it)

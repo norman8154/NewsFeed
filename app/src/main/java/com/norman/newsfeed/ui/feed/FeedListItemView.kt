@@ -65,7 +65,7 @@ fun ArticleListItemView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = articleBO.authorName,
+                    text = articleBO.newsSite,
                     style = TextStyle.SubTitleBold,
                     color = Color.Black,
                     maxLines = 1,

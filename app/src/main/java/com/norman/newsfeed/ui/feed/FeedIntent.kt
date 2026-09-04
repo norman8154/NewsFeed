@@ -13,4 +13,6 @@ sealed class FeedIntent : UiIntent {
 
     class OnUserClickSaveArticle(val articleBO: ArticleBO) : FeedIntent()
 
+    class OnUserClickArticle(val articleBO: ArticleBO) : FeedIntent()
+
 }

@@ -73,6 +73,10 @@ class FeedViewModel @Inject constructor(
                     }
                 }
             }
+
+            is FeedIntent.OnUserClickArticle -> {
+                emitUiEvent(FeedEvent.OnNavigateToArticleDetail(intent.articleBO.id))
+            }
         }
     }
 

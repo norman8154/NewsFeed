@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -34,6 +35,16 @@ fun SavedView(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is SavedEvent.OnNavigateToArticleDetail -> {
+                    onArticleClicked(event.articleId)
+                }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .topSystemInsetsPadding()
@@ -52,7 +63,9 @@ fun SavedView(
 
         SavedArticleListView(
             articleList = state.articleList,
-            onArticleClicked = onArticleClicked,
+            onArticleClicked = {
+                viewModel.sendIntent(SavedIntent.OnUserClickArticle(it))
+            },
             onSaveClicked = {
                 viewModel.sendIntent(SavedIntent.OnUserClickSaveArticle(it))
             },
@@ -66,7 +79,7 @@ fun SavedView(
 @Composable
 private fun SavedArticleListView(
     articleList: List<ArticleBO>,
-    onArticleClicked: (id: Long) -> Unit,
+    onArticleClicked: (ArticleBO) -> Unit,
     onSaveClicked: (ArticleBO) -> Unit,
     modifier: Modifier
 ) {
@@ -82,7 +95,7 @@ private fun SavedArticleListView(
             ArticleListItemView(
                 articleBO = articleBO,
                 onArticleClicked = {
-                    onArticleClicked(it.id)
+                    onArticleClicked(it)
                 },
                 onSaveClicked = {
                     onSaveClicked(it)

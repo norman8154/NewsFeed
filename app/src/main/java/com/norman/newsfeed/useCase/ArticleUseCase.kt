@@ -1,17 +1,19 @@
 package com.norman.newsfeed.useCase
 
+import com.norman.model.api.article.response.ArticleResponse
 import com.norman.model.api.articleList.response.ArticleListResponse
 import com.norman.newsfeed.base.or
 import com.norman.newsfeed.base.toEpochMilli
 import com.norman.newsfeed.pojo.ArticleBO
 import com.norman.repository.articleRepository.ArticleRepository
+import com.norman.room.entity.CachedArticleEntity
 import com.norman.room.entity.SavedArticleEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ArticleUseCase @Inject constructor(
-    private val articleRepository: ArticleRepository
+    private val articleRepository: ArticleRepository,
 ) {
 
     fun convertArticleListResponseToArticleBO(
@@ -21,40 +23,75 @@ class ArticleUseCase @Inject constructor(
         val savedIdSet = savedIdList.toSet()
 
         return response.results.map { article ->
-            ArticleBO(
-                id = article.id,
-                title = article.title,
-                authorName = article.authors.firstOrNull()?.name.orEmpty(),
-                newsSite = article.newsSite,
-                url = article.url,
-                imageUrl = article.imageUrl,
-                publishTime = article.publishedAt.toEpochMilli(),
-                updateTime = article.updatedAt.toEpochMilli(),
-                summary = article.summary,
-                isFeatured = article.featured.or(false),
+            convertArticleResponseToArticleBO(
+                article = article,
                 isSaved = article.id in savedIdSet,
             )
         }
+    }
+
+    fun convertArticleResponseToArticleBO(
+        article: ArticleResponse,
+        isSaved: Boolean,
+    ): ArticleBO {
+        return ArticleBO(
+            id = article.id,
+            title = article.title,
+            authorName = article.authors.firstOrNull()?.name.orEmpty(),
+            newsSite = article.newsSite,
+            url = article.url,
+            imageUrl = article.imageUrl,
+            publishTime = article.publishedAt.toEpochMilli(),
+            updateTime = article.updatedAt.toEpochMilli(),
+            summary = article.summary,
+            isFeatured = article.featured.or(false),
+            isSaved = isSaved,
+        )
     }
 
     fun convertSavedArticleEntityToArticleBO(
         savedArticleList: List<SavedArticleEntity>,
     ): List<ArticleBO> {
         return savedArticleList.map { savedArticle ->
-            ArticleBO(
-                id = savedArticle.id,
-                title = savedArticle.title,
-                authorName = savedArticle.authorName,
-                newsSite = savedArticle.newsSite,
-                url = savedArticle.url,
-                imageUrl = savedArticle.imageUrl,
-                publishTime = savedArticle.publishTime,
-                updateTime = savedArticle.updateTime,
-                summary = savedArticle.summary,
-                isFeatured = savedArticle.isFeatured,
-                isSaved = true,
-            )
+            convertSavedArticleEntityToArticleBO(savedArticle = savedArticle)
         }
+    }
+
+    fun convertSavedArticleEntityToArticleBO(
+        savedArticle: SavedArticleEntity,
+    ): ArticleBO {
+        return ArticleBO(
+            id = savedArticle.id,
+            title = savedArticle.title,
+            authorName = savedArticle.authorName,
+            newsSite = savedArticle.newsSite,
+            url = savedArticle.url,
+            imageUrl = savedArticle.imageUrl,
+            publishTime = savedArticle.publishTime,
+            updateTime = savedArticle.updateTime,
+            summary = savedArticle.summary,
+            isFeatured = savedArticle.isFeatured,
+            isSaved = true,
+        )
+    }
+
+    fun convertCachedArticleEntityToArticleBO(
+        cachedArticle: CachedArticleEntity,
+        isSaved: Boolean,
+    ): ArticleBO {
+        return ArticleBO(
+            id = cachedArticle.id,
+            title = cachedArticle.title,
+            authorName = cachedArticle.authorName,
+            newsSite = cachedArticle.newsSite,
+            url = cachedArticle.url,
+            imageUrl = cachedArticle.imageUrl,
+            publishTime = cachedArticle.publishTime,
+            updateTime = cachedArticle.updateTime,
+            summary = cachedArticle.summary,
+            isFeatured = cachedArticle.isFeatured,
+            isSaved = isSaved,
+        )
     }
 
     suspend fun saveArticleBOToDB(articleBO: ArticleBO): Long {
