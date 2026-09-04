@@ -19,6 +19,8 @@ android {
         consumerProguardFiles("consumer-rules.pro")
 
         buildConfigField("String", "NEWS_URL", "\"https://api.spaceflightnewsapi.net/\"")
+        buildConfigField("String", "WEATHER_URL", "\"https://api.open-meteo.com/\"")
+        buildConfigField("String", "SERVICE_URL", "\"https://dummyjson.com/\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

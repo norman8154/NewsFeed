@@ -2,6 +2,10 @@ package com.norman.repository.di
 
 import com.norman.repository.articleRepository.ArticleRepository
 import com.norman.repository.articleRepository.ArticleRepositoryImpl
+import com.norman.repository.serviceCardRepository.ServiceCardRepository
+import com.norman.repository.serviceCardRepository.ServiceCardRepositoryImpl
+import com.norman.repository.weatherRepository.WeatherRepository
+import com.norman.repository.weatherRepository.WeatherRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -15,5 +19,15 @@ abstract class RepositoryProvideModule {
     @Binds
     @Singleton
     abstract fun bindArticleRepository(articleRepositoryImpl: ArticleRepositoryImpl): ArticleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWeatherRepository(weatherRepositoryImpl: WeatherRepositoryImpl): WeatherRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindServiceCardRepository(
+        serviceCardRepositoryImpl: ServiceCardRepositoryImpl,
+    ): ServiceCardRepository
 
 }
